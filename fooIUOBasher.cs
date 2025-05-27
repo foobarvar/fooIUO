@@ -34,7 +34,6 @@ namespace fooIUO
         /// </summary>
         public bool UseLootmaster { get; set; } = true;
 
-
         /// <summary>
         /// Defines the maximum aggression distance in tiles. The script will identify viable mobiles as targets
         /// if they are within range of the number of tiles this property is set to. If this distance is longer
@@ -47,9 +46,7 @@ namespace fooIUO
         /// The serial (!) of the anti-paralyze crate. Leave at 0 if you have none, but you should really have one.
         /// Serial can be given as decimal or hexadecimal integer.
         /// </summary>
-        public int AntiParalyzeCrate { get; private set; } = 0;
-
-        
+        public int AntiParalyzeCrate { get; private set; } = 0x4007FBAA;
 
         /// <summary>
         /// Sets whether or not the script shall attempt to automatically cure the Blood Oath curse whenever it
@@ -60,7 +57,6 @@ namespace fooIUO
         /// </summary>
         public bool AutoCureBloodOath { get; set; } = true; 
 
-
         /// <summary>
         /// The time delay to elapse until the script starts the next cycle. On slower computers this can be raised
         /// but should probably not exceed 250 milliseconds. Raising this will also raise the frequency of target
@@ -68,7 +64,6 @@ namespace fooIUO
         /// Should not be below 25 ms for the time being.
         /// </summary>
         public int ParseDelay { get; private set; } = 25;
-
 
         /// <summary>
         /// Sets the targeting mode. 1 is the default and targets only neutral and evil mobiles - grey and red
@@ -107,7 +102,6 @@ namespace fooIUO
             "a dolphin", "a cu sidhe",
             "a pack horse", "a pack llama", "(summoned)", "bonded", "Loyalty"
         };
-
 
         /// <summary>
         /// UO hues for internal messaging. Can be customized to personal preferences.
@@ -230,7 +224,7 @@ namespace fooIUO
                 return;
             }
 
-            Item enchantedApples = Player.Backpack.Contains.Where(x => x.ItemID == 0x2FD8 && x.Color == 0x0488).FirstOrDefault();
+            Item enchantedApples = Player.Backpack.Contains.Where(x => x.ItemID == 0x2FD8 && x.Hue == 0x0488).FirstOrDefault();
 
             if (Player.BuffsExist("Blood Oath (curse)"))
             {
@@ -556,7 +550,7 @@ namespace fooIUO
                 return;
             }
 
-            Item goldStack = Player.Backpack.Contains.Where(x => x.ItemID == 0x0EED && x.Color == 0x000).FirstOrDefault();
+            Item goldStack = Player.Backpack.Contains.Where(x => x.ItemID == 0x0EED && x.Hue == 0x000).FirstOrDefault();
             Item bagOfSending = GetBagOfSending();
 
             if (goldStack != null && bagOfSending != null && GetCharges(bagOfSending) > 0)
