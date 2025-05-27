@@ -46,7 +46,7 @@ namespace fooIUO
         /// The serial (!) of the anti-paralyze crate. Leave at 0 if you have none, but you should really have one.
         /// Serial can be given as decimal or hexadecimal integer.
         /// </summary>
-        public int AntiParalyzeCrate { get; private set; } = 0x4007FBAA;
+        public int AntiParalyzeCrate { get; private set; } = 0;
 
         /// <summary>
         /// Sets whether or not the script shall attempt to automatically cure the Blood Oath curse whenever it
