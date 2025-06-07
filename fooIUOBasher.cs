@@ -7,14 +7,14 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using RazorEnhanced;
 
-namespace fooIUO
+namespace fooIUO.Basher
 {
     public class fooIUOBasher
     {
         /// <summary>
         /// Defines whether or not the script shall attempt to automatically bank gold via a bag of sending.
         /// </summary>
-        public bool AutoBankGold { get; private set; } = true;        
+        public bool AutoBankGold { get; set; } = true;        
         
         /// <summary>
         /// Sets the numeric limit for gold and the weight percentage limit to be reached before the AutoBanking
@@ -77,29 +77,24 @@ namespace fooIUO
         /// targets from being attacked by the script. If it is set to false instead, absolutely every mobile
         /// will be attacked.
         /// </summary>
-        public bool FilterTargets { get; private set; } = true;
+        public bool FilterTargets { get; set; } = true;
         
         /// <summary>
         /// Internal storage for the current target. Do not modify.
         /// </summary>
         public Mobile CurrentTarget { get; set; }
 
-        /// <summary>
-        /// Taken from ServUO code, used in cast delay calculations. Do not modify.
-        /// </summary>
-        public static readonly double HighFrequency = 1000.0 / Stopwatch.Frequency;
-        public static double Ticks { get { return Stopwatch.GetTimestamp() * HighFrequency; } }
 
         /// <summary>
         /// The script will check the properties of each target against this list. If it finds any substring from this list
         /// in the target's properties, the target will be deemed as invalid and be exempt from attacking. Use lowercase
         /// when adding entries, since the properties from each Mobile will transformed to lowercase as well.
         /// </summary>
-        private readonly List<string> _doNotTarget = new List<string>
+        private static readonly List<string> _doNotTarget = new List<string>
         {
             "healer", "priest of mondain",
             "a dog", "a cat", "a horse", "a sheep", "a crane", "a sheep", "a cow", "a bull", "a chicken", "a pig", "a boar",
-            "a dolphin", "a cu sidhe",
+            "a dolphin", "a cu sidhe", "bravehorn", "satyr",
             "a pack horse", "a pack llama", "(summoned)", "bonded", "Loyalty"
         };
 
@@ -112,59 +107,43 @@ namespace fooIUO
         private int _blue = 188;
 
 
+
+
+
+        //------------------------------------------//
+        // DO NOT CHANGE ANYTHING BELOW THIS POINT! //
+        //------------------------------------------//
+
+        
         /// <summary>
-        /// The Entry point for Razor Enhanced. Everything is hooked up to here.
+        /// Taken from ServUO code, used in cast delay calculations. Do not modify.
         /// </summary>
-        public void Run()
-        {
-            CheckPlayer();
-            Player.WeaponClearSA();
+        public static readonly double HighFrequency = 1000.0 / Stopwatch.Frequency;
+        public static double Ticks { get { return Stopwatch.GetTimestamp() * HighFrequency; } }
 
-            while (true)
-            {
-                if (!IsPlayerMoving())
-                {
-                    BreakParalysis();
-                    Misc.Pause(10);
-                    CureBloodOath();
-                    Misc.Pause(10);
-                    BankGold();
-                    Misc.Pause(10);
-
-                    List<Mobile> targets = GenerateTargetList();
-
-                    if (targets.Count > 0)
-                    {
-                        AttackNextTarget(targets.First());
-                        Misc.Pause(ParseDelay);
-                        UseSpecialAttack();
-                        Misc.Pause(ParseDelay);
-                    }
-                }
-            }
-        }
 
         /// <summary>
-        /// Displays the opening status checks.
+        /// Supported weapons, all have either Armor Ignore (AI) or Whirlwind (WW)
         /// </summary>
-        private void CheckPlayer()
+        private static List<BasherWeapon> weapons = new List<BasherWeapon>
         {
-            Misc.SendMessage($"foo> Welcome too fooBasher!", _green);
-            Misc.Pause(ParseDelay * 4);
-            Misc.SendMessage($"foo> Checking character ...", _blue);
-            Misc.SendMessage($"foo> Player STR: {Player.Str}", _blue);
-            Misc.SendMessage($"foo> Player DEX: {Player.Dex}", _blue);
-            Misc.SendMessage($"foo> Player INT: {Player.Int}", _blue);
-            Misc.Pause(ParseDelay * 4);
-            Misc.SendMessage($"foo> Player HP:  {Player.Hits}", _blue);
-            Misc.SendMessage($"foo> Player MP:  {Player.Mana}", _blue);
-            Misc.SendMessage($"foo> Player SP:  {Player.Stam}", _blue);
-            Misc.Pause(ParseDelay * 4);
-            Misc.SendMessage($"foo> Player LMC: {Player.LowerManaCost}", _blue);
-            Misc.SendMessage($"foo> Player FC:  {Player.FasterCasting}", _blue);
-            Misc.SendMessage($"foo> Player FCR: {Player.FasterCastRecovery}", _blue);
-        }
+            // Swordsmanship
+            new BasherWeapon(0x13FF, "katana", 2.5, 10, 14),
+            new BasherWeapon(0x2D33, "radiant scimitar", 2.5, 10, 14),
+            new BasherWeapon(0x0F5E, "broadsword", 3.25, 13, 17),
+            new BasherWeapon(0x0F61, "longsword", 3.5, 14, 18),
+            new BasherWeapon(0xA28B, "bladed whip", 3.25, 13, 17),
 
+            // Fencing
+            new BasherWeapon(0x1401, "kryss", 2.0, 10, 12),
+            new BasherWeapon(0x2D22, "leafblade", 2.75, 11, 15),
+            new BasherWeapon(0xA292, "spiked whip", 3.25, 13, 17),
+
+            // Mace Fighting
+            new BasherWeapon(0x13B0, "war axe", 3.0, 12, 16),
+            new BasherWeapon(0x143D, "hammer pick", 3.25, 13, 17),
+            new BasherWeapon(0xA289, "barbed whip", 3.25, 13, 17)
+        };
 
 
         /// <summary>
@@ -204,7 +183,7 @@ namespace fooIUO
                 {
                     Misc.SendMessage($"foo> Breaking paralysis ...", _yellow);
                     Items.UseItem(crate);
-                    Misc.Pause(ParseDelay);
+                    Misc.Pause(ParseDelay * 3);
                 }
             }
         }
@@ -232,6 +211,7 @@ namespace fooIUO
                 {
                     Items.UseItem(enchantedApples);
                     Misc.SendMessage($"foo> Enchanted apple eaten. Blood Oath cured!", _green);
+                    Misc.Pause(100);
                 }
                 else
                 {
@@ -242,9 +222,87 @@ namespace fooIUO
                         Spells.CastChivalry("Remove Curse");
                         Target.WaitForTarget(1000, true);
                         Target.Self();
-                        Misc.Pause(ParseDelay);
+                        Misc.Pause(ParseDelay * 3);
                     }
                 }
+            }
+        }
+
+
+        /// <summary>
+        /// Finds the bag of sending in the player's backpack.
+        /// </summary>
+        /// <returns>the first bag of sending found or null if there is none</returns>
+        private Item GetBagOfSending()
+        {
+            return Player.Backpack.Contains.Where(x => x.Name == "a bag of sending").FirstOrDefault();
+        }
+
+
+        /// <summary>
+        /// Reads the remaining charges on the bag of sending and returns those as an integer.
+        /// Parsing is done from the item properties.
+        /// </summary>
+        /// <param name="bag">the bag of sending to check (as Item object)</param>
+        /// <returns>the number of remaining charges</returns>
+        private int GetCharges(Item bag)
+        {
+            Property charges = bag.Properties.Last();
+            string value = Regex.Match(charges.ToString(), @"\d+").Value;
+            return Int32.Parse(value);
+        }
+
+
+        /// <summary>
+        /// Automatically banks gold via the bag of sending if the property AutoBankGold is set to true.
+        /// If Lootmaster is detected, it will be stopped and restarted after the banking procedure.
+        /// </summary>
+        private void BankGold()
+        {
+            if (!AutoBankGold)
+            {
+                return;
+            }
+
+            Item goldStack = Player.Backpack.Contains.Where(x => x.ItemID == 0x0EED && x.Hue == 0x000).FirstOrDefault();
+            Item bagOfSending = GetBagOfSending();
+
+            if (goldStack != null && bagOfSending != null && GetCharges(bagOfSending) > 0)
+            {
+                if (goldStack.Amount >= GoldLimit || Player.Weight >= (Player.MaxWeight * ((float)WeightPercentageLimit / 100)))
+                {
+                    if (UseLootmaster && Misc.ScriptStatus("Lootmaster.cs"))
+                    {
+                        Misc.ScriptStop("Lootmaster.cs");
+                        Misc.Pause(ParseDelay);
+                    }
+
+                    Misc.SendMessage($"foo> Attempting to bank {goldStack.Amount} gold.", _blue);
+
+                    Journal journal = new Journal();
+                    journal.Clear();
+
+                    Items.UseItem(bagOfSending);
+                    Target.WaitForTarget(1000, true);
+                    Target.TargetExecute(goldStack);
+                    Misc.Pause(ParseDelay * 12);
+
+                    if (journal.Search("was deposited"))
+                    {
+                        Misc.SendMessage($"foo> {goldStack.Amount} successfully banked.", _green);
+                        Misc.SendMessage($"foo> Your bag of sending has {GetCharges(bagOfSending)} charges left.", _blue);
+                    }
+
+                    if (UseLootmaster)
+                    {
+                        Misc.ScriptRun("Lootmaster.cs");
+                    }
+                }
+
+            }
+            else if (GetCharges(bagOfSending) == 0)
+            {
+                Misc.SendMessage($"foo> Your bag of sending has run out of charges.", _red);
             }
         }
 
@@ -306,10 +364,19 @@ namespace fooIUO
         /// </summary>
         /// <param name="mobile">the mobile to check</param>
         /// <returns>true for exemption, false for valid target</returns>
-        private bool IsInvalidTarget(Mobile mobile)
+        private static bool IsInvalidTarget(Mobile mobile)
         {
             string properties = String.Join(" ", mobile.Properties).ToLower();
-            return _doNotTarget.Any(x => properties.Contains(x));
+            
+            foreach (string keyword in _doNotTarget)
+            {
+                if (properties.Contains(keyword))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
 
@@ -326,27 +393,12 @@ namespace fooIUO
 
 
         /// <summary>
-        /// Returns the player's LMC stat factorized as a float, used for mana calculations for special attacks.
+        /// Returns the player's LMC stat factorized as a double, used for mana calculations for special attacks.
         /// </summary>
         /// <returns>the LMC factor</returns>
-        private float GetLMCFactor()
+        private double GetLMCFactor()
         {
             return Player.LowerManaCost / 100;
-        }
-
-
-        /// <summary>
-        /// Checks whether or not the passed target (from the target list) is still alive or has
-        /// already died. Used in check for the special attacks, with bad luck a normal hit kills
-        /// a target just after the last iteration of bashing fired - in this case the reference
-        /// to the target list might still be there and the script would attack a Mobile that has
-        /// since become an Item.
-        /// </summary>
-        /// <param name="mobile">an entry from the target list</param>
-        /// <returns>true when Mobile still exists, false if not</returns>
-        private bool IsAlive(Mobile mobile)
-        {
-            return Mobiles.FindBySerial(mobile.Serial) != null ? true : false;
         }
 
 
@@ -363,7 +415,7 @@ namespace fooIUO
 
 
         /// <summary>
-        /// Calculates the required spell delay for Shield based on the player's FCR stat.
+        /// Calculates the required spell delay based on the player's FCR stat.
         /// Taken from ServUO directly, might be refactored in later versions.
         /// </summary>
         /// <returns>adjusted spell delay in milliseconds</returns>
@@ -380,216 +432,286 @@ namespace fooIUO
         }
 
 
-        /// <summary>
-        /// Pulls the next target from the target list and attacks it
-        /// </summary>
-        private void AttackNextTarget(Mobile target)
-        {
-            CurrentTarget = target;
 
-            if (CurrentTarget != null)
+        /// <summary>
+        /// Calculates the weapon swing time based on the equipped weapon, the player's stamina and
+        /// the player's Swing Speed Increase (SSI). Formula taken from knuckleheads.dk
+        /// </summary>
+        /// <returns>the current swing time in milliseconds</returns>
+        private int GetSwingTime()
+        {
+            Item equipped = Player.GetItemOnLayer("RightHand");
+
+            if (equipped != null)
             {
-                Player.Attack(CurrentTarget);
-                Misc.Pause(25);
+                BasherWeapon weapon = weapons.Where(w => w.ItemId == equipped.ItemID).FirstOrDefault();
+
+                double weaponTicks = weapon.Speed * 4;
+                double staminaTicks = Math.Floor((double)Player.Stam / 30);
+
+                double result = (Math.Floor((weaponTicks - staminaTicks) * (100.0 / (100 + Player.SwingSpeedIncrease))) * 1000);
+                
+                return Math.Max((int) (result / 4), 1250);
             }
+
+            return 1250;
         }
 
 
         /// <summary>
-        /// Executes the best possible special attack based on number of proximity targets and mana.
-        /// Can be refactored into a single if-else-block but the current state makes it easier to
-        /// add more weapons for the user.
-        /// Order of selection:
-        /// 1. Shield Bash + Armor Ignore (Whirlwind) -> 40 + 30 = 70 mana (40 + 15 = 55) (* LMC factor)
-        /// 2. Shield Bash solo -> 40 mana (* LMC factor) -> single target FOR ALL weapons
-        /// 3. Armor Ignore / Whirlwind solo -> 30 / 15 mana (* LMC factor)
-        /// 4. normal basic attack
+        /// Checks if the target mobile of the player's last attack is still a valid Mobile or if 
+        /// it has either died or vanished - in both cases it is time to select a new victim.
         /// </summary>
-        private void UseSpecialAttack()
+        /// <returns>true if valid Mobile is found, false if not</returns>
+        private bool HasActiveTarget()
         {
-            int proximity = CountTargetsInProximity();
+            int targetSerial = Target.GetLastAttack();
+            Mobile target = Mobiles.FindBySerial(targetSerial);
+
+            return target != null;
+        }
+
+        /// <summary>
+        /// Decides on what attack to used based on the currently equipped weapon. Only the registered
+        /// weapons are considered so far, adding new ones is easy enough but questionable. Two handed
+        /// weapons will never be considered because a shield needs to be equipped anyway.
+        /// </summary>
+        /// <param name="target">the target to attack</param>
+        private void AttackTarget(Mobile target)
+        {
+
+            Player.Attack(target);
             Item weapon = Player.GetItemOnLayer("RightHand");
 
-            if (weapon != null)
+            switch (weapon.ItemID)
             {
-                switch (weapon.ItemID)
+                /* single target weapons with Armor Ignore as PRIMARY special ability */
+                case 0x13B0:    // war axe
+                    UseArmorIgnore(true);
+                    break;
+
+                /* single target weapons with Armor Ignore as SECONDARY special ability */
+                case 0x13FF:    // katana (all)
+                case 0x0F5E:    // broadsword
+                case 0x2D22:    // leaf blade
+                case 0x0F61:    // longsword
+                    UseArmorIgnore(false);
+                    break;
+
+                /* multi target weapons with Whirlwind as PRIMARY special ability  */
+                case 0x2D33:    // radiant scimitar
+                    UseWhirlwind(true);
+                    break;
+
+                /* multi target weapons with Whirlwind as SECONDARY special ability  */
+                case 0xA28B:    // bladed whip
+                case 0xA292:    // spiked whip
+                case 0xA289:    // barbed whip
+                    UseWhirlwind(false);
+                    break;
+
+                default:
+                    Misc.NoOperation();
+                    break;
+            }
+        }
+
+
+        /// <summary>
+        /// Fires the Armor Ignore special ability; based on current player mana this will
+        /// be either a combination of Shield Bash + AI (70 mana * LMC factor), Solo Shield
+        /// Bash (40 mana * LMC factor) or Solo AI (30 mana * LMC factor). If not even the 
+        /// lowest threshold is met, a standard weapon attack is performed.
+        /// </summary>
+        /// <param name="primary">true if AI is the primary weapon SA, false if it is the secondary</param>
+        private void UseArmorIgnore(bool primary)
+        {
+            if (Player.Mana >=  Convert.ToInt32(70 * GetLMCFactor()))
+            {
+                Spells.CastMastery("Shield Bash");
+                Misc.Pause(GetShieldBashDelay());
+
+                if (primary)
                 {
-                    /* single target weapons with Armor Ignore as PRIMARY special ability */
-                    case 0x13B0:    // war axe
+                    Player.WeaponPrimarySA();
+                }
+                else
+                {
+                    Player.WeaponSecondarySA();
+                }
 
-                        if (proximity > 0 && Player.Mana >= Math.Ceiling(70 * GetLMCFactor()) && IsAlive(CurrentTarget))
+                Misc.Pause(GetSwingTime() - GetSpellDelay());
+            }
+            else if (Player.Mana >= Convert.ToInt32(40 * GetLMCFactor()))
+            {
+                Spells.CastMastery("Shield Bash");
+                Misc.Pause(GetSwingTime() - GetShieldBashDelay());
+            }
+            else if (Player.Mana >= Convert.ToInt32(30 * GetLMCFactor()))
+            {
+                if (primary)
+                {
+                    Player.WeaponPrimarySA();
+                }
+                else
+                {
+                    Player.WeaponSecondarySA();
+                }
+
+                Misc.Pause(GetSwingTime() - GetSpellDelay());
+            }
+            else
+            {
+                Misc.SendMessage($"foo> Player Mana: {Player.Mana} -> Basic Attack!", _red);
+                Misc.Pause(GetSwingTime());
+            }
+        }
+
+
+        /// <summary>
+        /// Fires the Whirlwind special ability, analogue to the AI method above.
+        /// SWITCH instead of an if-else-block is used here to determine which is better,
+        /// so far I could not see any difference.
+        /// </summary>
+        /// <param name="primary">true for primary SA, false for secondary</param>
+        private void UseWhirlwind(bool primary)
+        {
+            switch (Player.Mana)
+            {
+                // Combo attack (55 base mana, LMC adjusted)
+                case int n when (n >= Convert.ToInt32(55 * GetLMCFactor())):
+
+                    Spells.CastMastery("Shield Bash");
+                    Misc.Pause(GetShieldBashDelay());
+
+                    // if there are enough targets for Whirlwind
+                    if (CountTargetsInProximity() >= 2)
+                    {
+                        if (primary)
                         {
-                            Spells.CastMastery("Shield Bash");
-                            Misc.Pause(GetShieldBashDelay());
                             Player.WeaponPrimarySA();
-                            Misc.Pause(GetSpellDelay());
                         }
-                        else if (proximity > 0 && Player.Mana >= Math.Ceiling(40 * GetLMCFactor()) && IsAlive(CurrentTarget))
+                        else
                         {
-                            Spells.CastMastery("Shield Bash");
-                            Misc.Pause(GetShieldBashDelay());
+                            Player.WeaponSecondarySA();
                         }
-                        else if (proximity > 0 && Player.Mana >= Math.Ceiling(30 * GetLMCFactor()) && IsAlive(CurrentTarget))
-                        {
-                            Player.WeaponPrimarySA();
-                            Misc.Pause(GetSpellDelay());
-                        }
+                        Misc.Pause(GetSwingTime() - GetSpellDelay());
+                    }
+                    else 
+                    { 
+                        Misc.Pause(GetSwingTime() - GetShieldBashDelay());
+                    }
 
                         break;
 
-                    /* single target weapons with Armor Ignore as SECONDARY special ability */
-                    case 0x13FF:    // katana (all)
-                    case 0x0F5E:    // broadsword
-                    case 0x2D22:    // leaf blade
-                    case 0x0F61:    // longsword
+                // Shield Bash only (40 base mana)
+                case int n when (n >= Convert.ToInt32(40 * GetLMCFactor())):
 
-                        if (proximity > 0 && Player.Mana >= Math.Ceiling(70 * GetLMCFactor()) && IsAlive(CurrentTarget))
-                        {
-                            Spells.CastMastery("Shield Bash");
-                            Misc.Pause(GetShieldBashDelay());
-                            Player.WeaponSecondarySA();
-                            Misc.Pause(GetSpellDelay());
-                        }
-                        else if (proximity > 0 && Player.Mana >= Math.Ceiling(40 * GetLMCFactor()) && IsAlive(CurrentTarget))
-                        {
-                            Spells.CastMastery("Shield Bash");
-                            Misc.Pause(GetShieldBashDelay());
-                        }
-                        else if (proximity > 0 && Player.Mana >= Math.Ceiling(30 * GetLMCFactor()) && IsAlive(CurrentTarget))
-                        {
-                            Player.WeaponSecondarySA();
-                            Misc.Pause(GetSpellDelay());
-                        }
+                    Spells.CastMastery("Shield Bash");
+                    Misc.Pause(GetSwingTime() - GetShieldBashDelay());
+                    break;
+                
+                // Whirlwind only (15 base mana)
+                case int n when (n >= Convert.ToInt32(15 *GetLMCFactor())):
 
-                        break;
-
-                    /* multi target weapons with Whirlwind as PRIMARY special ability  */
-                    case 0x2D33:    // radiant scimitar
-
-                        if (proximity >= 2 && Player.Mana >= Math.Ceiling(55 * GetLMCFactor()) && IsAlive(CurrentTarget))
-                        {
-                            Spells.CastMastery("Shield Bash");
-                            Misc.Pause(GetShieldBashDelay());
-                            Player.WeaponPrimarySA();
-                            Misc.Pause(GetSpellDelay());
-                        }
-                        else if (proximity > 0 && Player.Mana >= Math.Ceiling(30 * GetLMCFactor()) && IsAlive(CurrentTarget))
-                        {
-                            Spells.CastMastery("Shield Bash");
-                            Misc.Pause(GetShieldBashDelay());
-                        }
-                        else if (proximity >= 2 && Player.Mana >= Math.Ceiling(15 * GetLMCFactor()) && IsAlive(CurrentTarget))
+                    // if there are enough targets for Whirlwind
+                    if (CountTargetsInProximity() >= 2)
+                    {
+                        if (primary)
                         {
                             Player.WeaponPrimarySA();
-                            Misc.Pause(GetSpellDelay());
                         }
-
-                        break;
-
-                    /* multi target weapons with Whirlwind as SECONDARY special ability  */
-                    case 0xA28B:    // bladed whip
-                    case 0xA292:    // spiked whip
-                    case 0xA289:    // barbed whip
-
-                        if (proximity >= 2 && Player.Mana >= Math.Ceiling(55 * GetLMCFactor()) && IsAlive(CurrentTarget))
-                        {
-                            Spells.CastMastery("Shield Bash");
-                            Misc.Pause(GetShieldBashDelay());
-                            Player.WeaponSecondarySA();
-                            Misc.Pause(GetSpellDelay());
-                        }
-                        else if (proximity > 0 && Player.Mana >= Math.Ceiling(30 * GetLMCFactor()) && IsAlive(CurrentTarget))
-                        {
-                            Spells.CastMastery("Shield Bash");
-                            Misc.Pause(GetShieldBashDelay());
-                        }
-                        else if (proximity >= 2 && Player.Mana >= Math.Ceiling(15 * GetLMCFactor()) && IsAlive(CurrentTarget))
+                        else
                         {
                             Player.WeaponSecondarySA();
-                            Misc.Pause(GetSpellDelay());
                         }
+                        Misc.Pause(GetSwingTime() - GetSpellDelay());
+                    }
+                    else 
+                    { 
+                        Misc.Pause(GetSwingTime() - GetShieldBashDelay());
+                    }
+                    break;
 
-                        break;
+                // normal weapon hit when too little mana for anything else
+                default:
+                    Misc.Pause(GetSwingTime());
+                    break;
+            }
+        }
+
+
+        private void StartUp()
+        {
+            Misc.SendMessage($"foo> Welcome to fooBasher!", _green);
+            Misc.SendMessage("---------------------------", _green);
+            Misc.Pause(150);
+            Misc.SendMessage($"foo> Player FC is  {Player.FasterCasting}", _blue);
+            Misc.SendMessage($"foo> Ergo: Shield Bash cast time is {GetShieldBashDelay()} ms.", _yellow);
+            Misc.SendMessage("---------------------------", _blue);
+            Misc.Pause(150);
+            Misc.SendMessage($"foo> Player FCR is {Player.FasterCastRecovery}", _blue);
+            Misc.SendMessage($"foo> Ergo: Spell Delay is {GetSpellDelay()} ms.", _yellow);
+            Misc.SendMessage("---------------------------", _blue);
+            Misc.Pause(150);
+
+            Item equipped = Player.GetItemOnLayer("RightHand");
+            BasherWeapon weapon = weapons.Where(w => w.ItemId == equipped.ItemID).FirstOrDefault();
+            
+            Misc.SendMessage($"foo> Equipped weapon is a {weapon.Name}", _blue);
+            Misc.SendMessage($"foo> Ergo: Basic weapon speed is {weapon.Speed} s.", _yellow);
+            Misc.SendMessage("---------------------------", _blue);
+
+            Misc.SendMessage($"foo> Player SSI is {Player.SwingSpeedIncrease}", _blue);
+            Misc.SendMessage($"foo> Player Stamina is {Player.Stam}", _blue);
+
+            double seconds = (double) GetSwingTime() / 1000;
+
+            Misc.SendMessage($"foo> Ergo: Current Swing Speed is {seconds} s.", _yellow);
+            Misc.SendMessage("---------------------------", _blue);
+        }
+
+
+        public void Run()
+        {
+            StartUp();
+            Player.WeaponClearSA();
+
+            while (true)
+            {
+                if (!IsPlayerMoving())
+                {
+                    BreakParalysis();
+                    CureBloodOath();
+                    BankGold();
+
+                    Mobile target = GenerateTargetList().FirstOrDefault();
+                    if (target != null)
+                    {
+                        AttackTarget(target);
+                    }
+                    
+                    Misc.Pause(ParseDelay);
                 }
             }
         }
+    }
 
+    public class BasherWeapon
+    {
+        public int ItemId { get; set; }
+        public string Name { get; set; }
+        public double Speed { get; set; }
+        public int MinDamage { get; set; }
+        public int MaxDamage { get; set; }
 
-        /// <summary>
-        /// Finds the bag of sending in the player's backpack.
-        /// </summary>
-        /// <returns>the first bag of sending found or null if there is none</returns>
-        private Item GetBagOfSending()
+        public BasherWeapon(int itemId, string name, double speed, int minDamage, int maxDamage)
         {
-            return Player.Backpack.Contains.Where(x => x.Name == "a bag of sending").FirstOrDefault();
-        }
-
-
-        /// <summary>
-        /// Reads the remaining charges on the bag of sending and returns those as an integer.
-        /// Parsing is done from the item properties.
-        /// </summary>
-        /// <param name="bag">the bag of sending to check (as Item object)</param>
-        /// <returns>the number of remaining charges</returns>
-        private int GetCharges(Item bag)
-        {
-            Property charges = bag.Properties.Last();
-            string value = Regex.Match(charges.ToString(), @"\d+").Value;
-            return Int32.Parse(value);
-        }
-
-
-        /// <summary>
-        /// Automatically banks gold via the bag of sending if the property AutoBankGold is set to true.
-        /// If Lootmaster is detected, it will be stopped and restarted after the banking procedure.
-        /// </summary>
-        private void BankGold()
-        {
-            if (!AutoBankGold)
-            {
-                return;
-            }
-
-            Item goldStack = Player.Backpack.Contains.Where(x => x.ItemID == 0x0EED && x.Hue == 0x000).FirstOrDefault();
-            Item bagOfSending = GetBagOfSending();
-
-            if (goldStack != null && bagOfSending != null && GetCharges(bagOfSending) > 0)
-            {
-                if (goldStack.Amount >= GoldLimit || Player.Weight >= (Player.MaxWeight * ((float) WeightPercentageLimit / 100)))
-                {
-                    if (UseLootmaster && Misc.ScriptStatus("Lootmaster.cs"))
-                    {
-                        Misc.ScriptStop("Lootmaster.cs");
-                        Misc.Pause(ParseDelay);
-                    }
-
-                    Misc.SendMessage($"foo> Attempting to bank {goldStack.Amount} gold.", _blue);
-
-                    Journal journal = new Journal();
-                    journal.Clear();
-
-                    Items.UseItem(bagOfSending);
-                    Target.WaitForTarget(1000, true);
-                    Target.TargetExecute(goldStack);
-                    Misc.Pause(ParseDelay * 12);
-
-                    if (journal.Search("was deposited"))
-                    {
-                        Misc.SendMessage($"foo> {goldStack.Amount} successfully banked.", _green);
-                        Misc.SendMessage($"foo> Your bag of sending has {GetCharges(bagOfSending)} charges left.", _blue);
-                    }
-
-                    if (UseLootmaster)
-                    {
-                        Misc.ScriptRun("Lootmaster.cs");
-                    }
-                }
-
-            }
-            else if (GetCharges(bagOfSending) == 0)
-            {
-                Misc.SendMessage($"foo> Your bag of sending has run out of charges.", _red);
-            }
+            ItemId = itemId;
+            Name = name;
+            Speed = speed;
+            MinDamage = minDamage;
+            MaxDamage = maxDamage;
         }
     }
 }
