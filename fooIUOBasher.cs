@@ -570,73 +570,61 @@ namespace fooIUO.Basher
 
         /// <summary>
         /// Fires the Whirlwind special ability, analogue to the AI method above.
-        /// SWITCH instead of an if-else-block is used here to determine which is better,
-        /// so far I could not see any difference.
         /// </summary>
         /// <param name="primary">true for primary SA, false for secondary</param>
         private void UseWhirlwind(bool primary)
         {
-            switch (Player.Mana)
+            if (Player.Mana >= Convert.ToInt32(55 * GetLMCFactor()))
             {
-                // Combo attack (55 base mana, LMC adjusted)
-                case int n when (n >= Convert.ToInt32(55 * GetLMCFactor())):
+                Spells.CastMastery("Shield Bash");
+                Misc.Pause(GetShieldBashDelay());
 
-                    Spells.CastMastery("Shield Bash");
-                    Misc.Pause(GetShieldBashDelay());
-
-                    // if there are enough targets for Whirlwind
-                    if (CountTargetsInProximity() >= 2)
+                // if there are enough targets for Whirlwind
+                if (CountTargetsInProximity() >= 2)
+                {
+                    if (primary)
                     {
-                        if (primary)
-                        {
-                            Player.WeaponPrimarySA();
-                        }
-                        else
-                        {
-                            Player.WeaponSecondarySA();
-                        }
-                        Misc.Pause(GetSwingTime() - GetSpellDelay());
+                        Player.WeaponPrimarySA();
                     }
-                    else 
-                    { 
-                        Misc.Pause(GetSwingTime() - GetShieldBashDelay());
+                    else
+                    {
+                        Player.WeaponSecondarySA();
                     }
-
-                        break;
-
-                // Shield Bash only (40 base mana)
-                case int n when (n >= Convert.ToInt32(40 * GetLMCFactor())):
-
-                    Spells.CastMastery("Shield Bash");
+                    Misc.Pause(GetSwingTime() - GetSpellDelay());
+                }
+                else
+                {
                     Misc.Pause(GetSwingTime() - GetShieldBashDelay());
-                    break;
-                
-                // Whirlwind only (15 base mana)
-                case int n when (n >= Convert.ToInt32(15 *GetLMCFactor())):
-
-                    // if there are enough targets for Whirlwind
-                    if (CountTargetsInProximity() >= 2)
+                }
+            }
+            else if (Player.Mana >= Convert.ToInt32(40 * GetLMCFactor()))
+            {
+                Spells.CastMastery("Shield Bash");
+                Misc.Pause(GetSwingTime() - GetShieldBashDelay());
+            }
+            else if (Player.Mana >= Convert.ToInt32(15 * GetLMCFactor()))
+            {
+                // if there are enough targets for Whirlwind
+                if (CountTargetsInProximity() >= 2)
+                {
+                    if (primary)
                     {
-                        if (primary)
-                        {
-                            Player.WeaponPrimarySA();
-                        }
-                        else
-                        {
-                            Player.WeaponSecondarySA();
-                        }
-                        Misc.Pause(GetSwingTime() - GetSpellDelay());
+                        Player.WeaponPrimarySA();
                     }
-                    else 
-                    { 
-                        Misc.Pause(GetSwingTime() - GetShieldBashDelay());
+                    else
+                    {
+                        Player.WeaponSecondarySA();
                     }
-                    break;
-
-                // normal weapon hit when too little mana for anything else
-                default:
-                    Misc.Pause(GetSwingTime());
-                    break;
+                    Misc.Pause(GetSwingTime() - GetSpellDelay());
+                }
+                else
+                {
+                    Misc.Pause(GetSwingTime() - GetShieldBashDelay());
+                }
+            }
+            else
+            {
+                Misc.Pause(GetSwingTime());
             }
         }
 
