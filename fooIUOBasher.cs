@@ -398,7 +398,7 @@ namespace fooIUO.Basher
         /// <returns>the LMC factor</returns>
         private double GetLMCFactor()
         {
-            return Player.LowerManaCost / 100;
+            return (double)Player.LowerManaCost / 100;
         }
 
 
@@ -657,6 +657,7 @@ namespace fooIUO.Basher
 
             Misc.SendMessage($"foo> Ergo: Current Swing Speed is {seconds} s.", _yellow);
             Misc.SendMessage("---------------------------", _blue);
+            Misc.SendMessage($"foo> LMC factor is {GetLMCFactor()}", _blue);
         }
 
 
