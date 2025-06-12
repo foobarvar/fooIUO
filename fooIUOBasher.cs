@@ -12,6 +12,16 @@ namespace fooIUO.Basher
     public class fooIUOBasher
     {
         /// <summary>
+        /// This determines whether or not the script shall attempt to cast "helper spells" whenever 
+        /// enemies are near. Both can be set by using the setup gump, but the initial setting can
+        /// - and should - be set here so you don't have to use the gump every time you start the
+        /// script.
+        /// </summary>
+        public bool UseConsecrateWeapon { get; set; } = false;
+        public bool UseDivineFury { get; set; } = false;
+
+
+        /// <summary>
         /// Defines whether or not the script shall attempt to automatically bank gold via a bag of sending.
         /// </summary>
         public bool AutoBankGold { get; set; } = true;        
@@ -114,6 +124,10 @@ namespace fooIUO.Basher
         // DO NOT CHANGE ANYTHING BELOW THIS POINT! //
         //------------------------------------------//
 
+        private readonly string _version = "0.9.2 BETA";
+
+        private BasherShield _shield;
+
         
         /// <summary>
         /// Taken from ServUO code, used in cast delay calculations. Do not modify.
@@ -142,7 +156,12 @@ namespace fooIUO.Basher
             // Mace Fighting
             new BasherWeapon(0x13B0, "war axe", 3.0, 12, 16),
             new BasherWeapon(0x143D, "hammer pick", 3.25, 13, 17),
-            new BasherWeapon(0xA289, "barbed whip", 3.25, 13, 17)
+            new BasherWeapon(0xA289, "barbed whip", 3.25, 13, 17),
+
+            // Throwing
+            new BasherWeapon(0x090A, "soul glaive", 4.0, 16, 20),
+            new BasherWeapon(0x0901, "cyclone", 3.25, 13, 17),
+            new BasherWeapon(0x08FF, "boomerang", 2.75, 11, 15)
         };
 
 
@@ -154,6 +173,12 @@ namespace fooIUO.Basher
         /// <returns>the handle of GetAsyncKeyState</returns>
         [DllImport("user32.dll")]
         public static extern short GetAsyncKeyState(int vKey);
+
+
+        /// <summary>
+        /// The unique Id necessary for the status gump.
+        /// </summary>
+        private readonly uint _gumpId = 1239862391;
 
 
         /// <summary>
@@ -211,6 +236,7 @@ namespace fooIUO.Basher
                 {
                     Items.UseItem(enchantedApples);
                     Misc.SendMessage($"foo> Enchanted apple eaten. Blood Oath cured!", _green);
+                    UpdateGump();
                     Misc.Pause(100);
                 }
                 else
@@ -267,6 +293,8 @@ namespace fooIUO.Basher
             Item goldStack = Player.Backpack.Contains.Where(x => x.ItemID == 0x0EED && x.Hue == 0x000).FirstOrDefault();
             Item bagOfSending = GetBagOfSending();
 
+            if (bagOfSending == null) return;
+
             if (goldStack != null && bagOfSending != null && GetCharges(bagOfSending) > 0)
             {
                 if (goldStack.Amount >= GoldLimit || Player.Weight >= (Player.MaxWeight * ((float)WeightPercentageLimit / 100)))
@@ -287,16 +315,18 @@ namespace fooIUO.Basher
                     Target.TargetExecute(goldStack);
                     Misc.Pause(ParseDelay * 12);
 
-                    if (journal.Search("was deposited"))
-                    {
-                        Misc.SendMessage($"foo> {goldStack.Amount} successfully banked.", _green);
-                        Misc.SendMessage($"foo> Your bag of sending has {GetCharges(bagOfSending)} charges left.", _blue);
-                    }
+                    //if (journal.Search("was deposited"))
+                    //{
+                    //    Misc.SendMessage($"foo> {goldStack.Amount} successfully banked.", _green);
+                    //    Misc.SendMessage($"foo> Your bag of sending has {GetCharges(bagOfSending)} charges left.", _blue);
+                    //}
 
                     if (UseLootmaster)
                     {
                         Misc.ScriptRun("Lootmaster.cs");
                     }
+
+                    UpdateGump();
                 }
 
             }
@@ -487,6 +517,7 @@ namespace fooIUO.Basher
             {
                 /* single target weapons with Armor Ignore as PRIMARY special ability */
                 case 0x13B0:    // war axe
+                case 0x090A:    // soul glaive
                     UseArmorIgnore(true);
                     break;
 
@@ -526,7 +557,9 @@ namespace fooIUO.Basher
         /// <param name="primary">true if AI is the primary weapon SA, false if it is the secondary</param>
         private void UseArmorIgnore(bool primary)
         {
-            if (Player.Mana >=  Convert.ToInt32(70 * GetLMCFactor()))
+            UpdateGump();
+
+            if (Player.Mana >=  Convert.ToInt32(Math.Ceiling(70 * GetLMCFactor())))
             {
                 Spells.CastMastery("Shield Bash");
                 Misc.Pause(GetShieldBashDelay());
@@ -542,12 +575,12 @@ namespace fooIUO.Basher
 
                 Misc.Pause(GetSwingTime() - GetSpellDelay());
             }
-            else if (Player.Mana >= Convert.ToInt32(40 * GetLMCFactor()))
+            else if (Player.Mana >= Convert.ToInt32(Math.Ceiling(41 * GetLMCFactor())))
             {
                 Spells.CastMastery("Shield Bash");
                 Misc.Pause(GetSwingTime() - GetShieldBashDelay());
             }
-            else if (Player.Mana >= Convert.ToInt32(30 * GetLMCFactor()))
+            else if (Player.Mana >= Convert.ToInt32(Math.Ceiling(30 * GetLMCFactor())))
             {
                 if (primary)
                 {
@@ -562,9 +595,11 @@ namespace fooIUO.Basher
             }
             else
             {
-                Misc.SendMessage($"foo> Player Mana: {Player.Mana} -> Basic Attack!", _red);
+                //Misc.SendMessage($"foo> Player Mana: {Player.Mana} -> Basic Attack!", _red);
                 Misc.Pause(GetSwingTime());
             }
+
+
         }
 
 
@@ -626,12 +661,18 @@ namespace fooIUO.Basher
             {
                 Misc.Pause(GetSwingTime());
             }
+
+            UpdateGump();
         }
 
 
+        /// <summary>
+        /// Displays the greeting and some status checks.
+        /// </summary>
         private void StartUp()
         {
             Misc.SendMessage($"foo> Welcome to fooBasher!", _green);
+            Misc.SendMessage($"foo> Current version: {_version}", _green);
             Misc.SendMessage("---------------------------", _green);
             Misc.Pause(150);
             Misc.SendMessage($"foo> Player FC is  {Player.FasterCasting}", _blue);
@@ -650,6 +691,10 @@ namespace fooIUO.Basher
             Misc.SendMessage($"foo> Ergo: Basic weapon speed is {weapon.Speed} s.", _yellow);
             Misc.SendMessage("---------------------------", _blue);
 
+            Misc.SendMessage($"foo> Parsing shield data ...", _blue);
+            _shield = GetShieldData();
+            Misc.SendMessage("---------------------------", _blue);
+
             Misc.SendMessage($"foo> Player SSI is {Player.SwingSpeedIncrease}", _blue);
             Misc.SendMessage($"foo> Player Stamina is {Player.Stam}", _blue);
 
@@ -661,10 +706,177 @@ namespace fooIUO.Basher
         }
 
 
+
+        private int GetshieldDurabilityHue()
+        {
+            if (_shield.Durability >= _shield.MaxDurability * 0.6)
+            {
+                return _green;
+            }
+
+            if (_shield.Durability >= _shield.MaxDurability * 0.2)
+            {
+                return _yellow;
+            }
+
+            if (_shield.Durability <= _shield.MaxDurability * 0.2)
+            {
+                return _red;
+            }
+
+            return 0;
+        }
+
+
+        private int GetBagOfSendingChargesHue()
+        {
+            if (GetCharges(GetBagOfSending()) >= 50)
+            {
+                return _green;
+            }
+
+            if (GetCharges(GetBagOfSending()) >= 25)
+            {
+                return _yellow;
+            }
+
+            if (GetCharges(GetBagOfSending()) <= 10)
+            {
+                return _red;
+            }
+
+            return 0;
+        }
+
+
+        private int GetEnchantedApplesCountHue()
+        {
+            int count = CountEnchantedApples();
+
+            if (count >= 25)
+            {
+                return _green;
+            }
+
+            if (count >= 15)
+            {
+                return _yellow;
+            }
+
+            if (count <= 10)
+            {
+                return _red;
+            }
+
+            return 0;
+        }
+
+
+        private int CountEnchantedApples()
+        {
+            return Player.Backpack.Contains.Where(x => x.ItemID == 0x2FD8 && x.Hue == 0x0488).FirstOrDefault().Amount;
+        }
+
+
+        /// <summary>
+        /// (Re-)renders the status gump. Gets fired from various places.
+        /// </summary>
+        private void UpdateGump()
+        {
+            Gumps.GumpData basherGump = Gumps.CreateGump(true, true, true, false);
+
+            basherGump.buttonid = -1;
+            basherGump.gumpId = _gumpId;
+            basherGump.serial = Convert.ToUInt32(Player.Serial);
+            basherGump.x = 600;
+            basherGump.y = 100;
+
+            Gumps.AddBackground(ref basherGump, 0, 0, 380, 100, 3500);
+            Gumps.AddLabel(ref basherGump, 30, 15, 1258, "fooBasher Status Gump");
+
+            // Shield durability monitor
+            _shield = GetShieldData();
+            Gumps.AddItem(ref basherGump, 30, 45, _shield.ItemId, _shield.Hue);
+            Gumps.AddLabel(ref basherGump, 85, 45, 0, "Durability:");
+            Gumps.AddLabel(ref basherGump, 85, 65, GetshieldDurabilityHue(), _shield.Durability.ToString());
+            Gumps.AddLabel(ref basherGump, 107, 65, 0, " / " + _shield.MaxDurability.ToString());
+
+            // Bag of Sending monitor
+            Gumps.AddItem(ref basherGump, 160, 45, GetBagOfSending().ItemID, GetBagOfSending().Hue);
+            Gumps.AddLabel(ref basherGump, 195, 45, 0, "Charges: ");
+            Gumps.AddLabel(ref basherGump, 250, 45, GetBagOfSendingChargesHue(), GetCharges(GetBagOfSending()).ToString());
+
+            // Enchanted apples monitor
+            Gumps.AddItem(ref basherGump, 160, 68, 0x2FD8, 0x0488);
+            Gumps.AddLabel(ref basherGump, 195, 65, 0, "Apples: ");
+            Gumps.AddLabel(ref basherGump, 250, 65, GetEnchantedApplesCountHue(), CountEnchantedApples().ToString());
+
+            // Switches
+            Gumps.AddButton(ref basherGump, 300, 46, 0x4BA, 0x4B9, 1, 1, 1);
+            Gumps.AddLabel(ref basherGump, 320, 45, GetStatusHue("CW"), "CW");
+            Gumps.AddButton(ref basherGump, 300, 66, 0x4BA, 0x4B9, 2, 1, 1);
+            Gumps.AddLabel(ref basherGump, 320, 65, GetStatusHue("DF"), "DF");
+
+
+
+
+            Gumps.CloseGump(_gumpId);
+            Gumps.SendGump(basherGump, 0, 0);
+        }
+
+
+        /// <summary>
+        /// Reads the data from the equipped shield and displays the durability. The icon displayed in the gump
+        /// will match the shield actually equipped, including the hue.
+        /// </summary>
+        /// <returns>BasherShield object (see below)</returns>
+        private BasherShield GetShieldData()
+        {
+            BasherShield basherShield = new BasherShield();
+            Item shield = Player.GetItemOnLayer("LeftHand");
+
+            if (shield != null)
+            {
+                basherShield.ItemId = shield.ItemID;
+                basherShield.Name = shield.Name;
+                basherShield.Hue = shield.Hue;
+
+                string[] durability = shield.Properties.Where(x => x.Number == 1060639).First().ToString().Split(' ', '/');
+                basherShield.Durability = Convert.ToInt32(durability[1]);
+                basherShield.MaxDurability = Convert.ToInt32(durability[4]);
+            }
+
+            return basherShield;
+        }
+
+
+
+        private int GetStatusHue(string spell)
+        {
+            switch (spell)
+            {
+                case "CW":
+                    return (UseConsecrateWeapon) ? _green : _red;
+
+                case "DF":
+                    return (UseDivineFury) ? _green : _red;
+
+                default:
+                    return 0;
+            }
+        }
+
+
+        /// <summary>
+        /// The main entry point.
+        /// </summary>
         public void Run()
         {
             StartUp();
             Player.WeaponClearSA();
+            Journal journal = new Journal();
+
+            UpdateGump();
 
             while (true)
             {
@@ -674,10 +886,55 @@ namespace fooIUO.Basher
                     CureBloodOath();
                     BankGold();
 
+                    Gumps.GumpData reply = Gumps.GetGumpData(_gumpId);
+
+                    switch (reply.buttonid)
+                    {
+                        case 1:
+                            UseConsecrateWeapon ^= true;
+                            UpdateGump();
+                            Misc.Pause(ParseDelay);
+                            continue;
+
+                        case 2:
+                            UseDivineFury ^= true;
+                            UpdateGump();
+                            Misc.Pause(ParseDelay);
+                            continue;
+                    }
+
                     Mobile target = GenerateTargetList().FirstOrDefault();
                     if (target != null)
                     {
+                        if (UseConsecrateWeapon && Player.Mana >=  Convert.ToInt32(Math.Ceiling(10 * GetLMCFactor())))
+                        {
+                            if (!Player.BuffsExist("Consecrate Weapon"))
+                            {
+                                Spells.CastChivalry("Consecrate Weapon");
+                                Misc.Pause(GetSpellDelay());
+                            }
+                        }
+
+                        if (UseDivineFury && Player.Mana >=  Convert.ToInt32(Math.Ceiling(15 * GetLMCFactor())))
+                        {
+                            if (!Player.BuffsExist("Divine Fury"))
+                            {
+                                Spells.CastChivalry("Divine Fury");
+                                Misc.Pause(GetSpellDelay());
+                            }
+                        }
+
                         AttackTarget(target);
+                    }
+
+
+
+
+
+                    if (journal.Search("Repairing..."))
+                    {
+                        journal.Clear();
+                        UpdateGump();
                     }
                     
                     Misc.Pause(ParseDelay);
@@ -685,6 +942,7 @@ namespace fooIUO.Basher
             }
         }
     }
+
 
     public class BasherWeapon
     {
@@ -702,5 +960,26 @@ namespace fooIUO.Basher
             MinDamage = minDamage;
             MaxDamage = maxDamage;
         }
+    }
+
+
+    public class BasherShield
+    {
+        public int ItemId { get; set; }
+        public string Name { get; set; }
+        public int Hue { get; set; }
+        public int Durability { get; set; }
+        public int MaxDurability { get; set; }
+
+        public BasherShield(int itemId, string name, int hue, int durability, int maxDurability)
+        {
+            ItemId = itemId;
+            Name = name;
+            Hue = hue;
+            Durability = durability;
+            MaxDurability = maxDurability;
+        }
+
+        public BasherShield() {}
     }
 }
