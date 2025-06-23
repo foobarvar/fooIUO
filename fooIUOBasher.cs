@@ -19,7 +19,7 @@ namespace fooIUO.Basher
         /// </summary>
         public bool UseConsecrateWeapon { get; set; } = false;
         public bool UseDivineFury { get; set; } = false;
-
+        public bool UseEnemyOfOne { get; set; } = true;
 
         /// <summary>
         /// Defines whether or not the script shall attempt to automatically bank gold via a bag of sending.
@@ -56,6 +56,7 @@ namespace fooIUO.Basher
         /// The serial (!) of the anti-paralyze crate. Leave at 0 if you have none, but you should really have one.
         /// Serial can be given as decimal or hexadecimal integer.
         /// </summary>
+        //public int AntiParalyzeCrate { get; private set; } = 0;
         public int AntiParalyzeCrate { get; private set; } = 0;
 
         /// <summary>
@@ -76,11 +77,11 @@ namespace fooIUO.Basher
         public int ParseDelay { get; private set; } = 25;
 
         /// <summary>
-        /// Sets the targeting mode. 1 is the default and targets only neutral and evil mobiles - grey and red
-        /// stuff. If this is set to 0, blue mobiles are added to the potential targets. Useful for hunting
-        /// Cu Sidhes or Unicorns. Even if this is set to 0, the standard filter will still apply.
+        /// Sets the targeting mode. false is the default and targets only neutral and evil mobiles - grey and red
+        /// stuff. If this is set to true, blue mobiles are added to the potential targets. Useful for hunting
+        /// Cu Sidhes or Unicorns. Even if this is set to true, the standard filter will still apply.
         /// </summary>
-        public int TargetingMode { get; private set; } = 1;
+        public bool TargetBlues { get; private set; } = false;
 
         /// <summary>
         /// Sets the filtering mode. If set to true, the _doNotTarget field defined below will exempt certain
@@ -108,6 +109,35 @@ namespace fooIUO.Basher
             "a pack horse", "a pack llama", "(summoned)", "bonded", "Loyalty"
         };
 
+
+        /// <summary>
+        /// If a mob's name is matched to any entry in this list, the script will attempt to cast EOO if that mobile is the
+        /// only target in the area. If anything else spawns, the next cycle will automatically cancel EOO. Entries can be 
+        /// added, make sure to include the COMMA.
+        /// </summary>
+        private static readonly List<string> _eooTargets = new List<string>
+        {
+            // common Champs
+            "Neira", "Mephitis", "Rikktor", "Barracoon", "Semidar", "Lord Oaks", "Sylvani",
+
+            // advanced Champs
+            "Dragon Turtle", "Serado", "Yukio's Captor", "Meraktus", "Ilhenir", "Twaulo", "Abyssal Infernal", "Primeval Lich", "Khal Ankur",
+
+            // Peerless
+            "Medusa", "Stygian Dragon", "Dread Horn", "Lady Melisande", "Paroxysmus", "Shimmering Effusion", "Monstrous Interred Grizzle",
+            "Travesty", 
+
+            // Doom
+            "Abyssmal Horror", "Fleshrenderer", "Darknight Creeper", "Impaler", "Shadow Knight", "Dark Father", "Bone Daemon",
+
+            // Shadowguard
+            "Anon", "Virtuebane", "Ozymandias", "Juo'nar",
+
+            // general assholes
+            "evil spellbook", "Slasher of Veils", "Putrefier", "Harrower",
+        };
+
+
         /// <summary>
         /// UO hues for internal messaging. Can be customized to personal preferences.
         /// </summary>
@@ -124,7 +154,7 @@ namespace fooIUO.Basher
         // DO NOT CHANGE ANYTHING BELOW THIS POINT! //
         //------------------------------------------//
 
-        private readonly string _version = "0.9.2 BETA";
+        private readonly string _version = "0.9.5 BETA";
 
         private BasherShield _shield;
 
@@ -162,6 +192,28 @@ namespace fooIUO.Basher
             new BasherWeapon(0x090A, "soul glaive", 4.0, 16, 20),
             new BasherWeapon(0x0901, "cyclone", 3.25, 13, 17),
             new BasherWeapon(0x08FF, "boomerang", 2.75, 11, 15)
+        };
+
+
+        /// <summary>
+        /// A mapping for the various slayer types with their respective properties strings
+        /// taken from ServUO code.
+        /// </summary>
+        public static List<SlayerType> Slayers { get; private set; } = new List<SlayerType>
+        {
+            // Super Slayers
+            new SlayerType(1060458, "Arachnid"),
+            new SlayerType(1060461, "Demon"),
+            new SlayerType(1060464, "Elemental"),
+            new SlayerType(1060472, "Repond"),
+            new SlayerType(1060473, "Reptile"),
+            new SlayerType(1060479, "Undead"),
+            new SlayerType(1070855, "Fey"),
+            new SlayerType(1156126, "Eodon"),
+
+            // Lesser Slayers
+
+
         };
 
 
@@ -229,6 +281,11 @@ namespace fooIUO.Basher
             }
 
             Item enchantedApples = Player.Backpack.Contains.Where(x => x.ItemID == 0x2FD8 && x.Hue == 0x0488).FirstOrDefault();
+
+            if (enchantedApples == null)
+            {
+                return;
+            }
 
             if (Player.BuffsExist("Blood Oath (curse)"))
             {
@@ -315,11 +372,6 @@ namespace fooIUO.Basher
                     Target.TargetExecute(goldStack);
                     Misc.Pause(ParseDelay * 12);
 
-                    //if (journal.Search("was deposited"))
-                    //{
-                    //    Misc.SendMessage($"foo> {goldStack.Amount} successfully banked.", _green);
-                    //    Misc.SendMessage($"foo> Your bag of sending has {GetCharges(bagOfSending)} charges left.", _blue);
-                    //}
 
                     if (UseLootmaster)
                     {
@@ -347,17 +399,17 @@ namespace fooIUO.Basher
         {
             List<byte> notorieties = new List<byte>();
 
-            switch (TargetingMode)
+            switch (TargetBlues)
             {
                 // targets ALL viable Mobiles, including "good" ones
-                case 0:
+                case true:
                     notorieties.Add(1);
                     notorieties.Add(2);
                     notorieties.Add(3);
                     break;
                 
                 // targets only "neutral / grey" Mobiles
-                case 1:
+                case false:
                     notorieties.Add(3);
                     break;
             }
@@ -513,11 +565,18 @@ namespace fooIUO.Basher
             Player.Attack(target);
             Item weapon = Player.GetItemOnLayer("RightHand");
 
+            if (weapon == null)
+            {
+                Misc.Pause(ParseDelay);
+                return;
+            }
+
             switch (weapon.ItemID)
             {
                 /* single target weapons with Armor Ignore as PRIMARY special ability */
                 case 0x13B0:    // war axe
                 case 0x090A:    // soul glaive
+                case 0x0F61:    // longsword
                     UseArmorIgnore(true);
                     break;
 
@@ -525,7 +584,6 @@ namespace fooIUO.Basher
                 case 0x13FF:    // katana (all)
                 case 0x0F5E:    // broadsword
                 case 0x2D22:    // leaf blade
-                case 0x0F61:    // longsword
                     UseArmorIgnore(false);
                     break;
 
@@ -573,7 +631,7 @@ namespace fooIUO.Basher
                     Player.WeaponSecondarySA();
                 }
 
-                Misc.Pause(GetSwingTime() - GetSpellDelay());
+                Misc.Pause(GetSwingTime() - GetSpellDelay() - 200);
             }
             else if (Player.Mana >= Convert.ToInt32(Math.Ceiling(41 * GetLMCFactor())))
             {
@@ -591,7 +649,7 @@ namespace fooIUO.Basher
                     Player.WeaponSecondarySA();
                 }
 
-                Misc.Pause(GetSwingTime() - GetSpellDelay());
+                Misc.Pause(GetSwingTime() - GetSpellDelay() - 200);
             }
             else
             {
@@ -625,7 +683,7 @@ namespace fooIUO.Basher
                     {
                         Player.WeaponSecondarySA();
                     }
-                    Misc.Pause(GetSwingTime() - GetSpellDelay());
+                    Misc.Pause(GetSwingTime() - GetSpellDelay() - 200);
                 }
                 else
                 {
@@ -650,7 +708,7 @@ namespace fooIUO.Basher
                     {
                         Player.WeaponSecondarySA();
                     }
-                    Misc.Pause(GetSwingTime() - GetSpellDelay());
+                    Misc.Pause(GetSwingTime() - GetSpellDelay() - 200);
                 }
                 else
                 {
@@ -685,11 +743,14 @@ namespace fooIUO.Basher
             Misc.Pause(150);
 
             Item equipped = Player.GetItemOnLayer("RightHand");
-            BasherWeapon weapon = weapons.Where(w => w.ItemId == equipped.ItemID).FirstOrDefault();
+            if (equipped != null)
+            {
+                BasherWeapon weapon = weapons.Where(w => w.ItemId == equipped.ItemID).FirstOrDefault();
             
-            Misc.SendMessage($"foo> Equipped weapon is a {weapon.Name}", _blue);
-            Misc.SendMessage($"foo> Ergo: Basic weapon speed is {weapon.Speed} s.", _yellow);
-            Misc.SendMessage("---------------------------", _blue);
+                Misc.SendMessage($"foo> Equipped weapon is a {weapon.Name}", _blue);
+                Misc.SendMessage($"foo> Ergo: Basic weapon speed is {weapon.Speed} s.", _yellow);
+                Misc.SendMessage("---------------------------", _blue);
+            }
 
             Misc.SendMessage($"foo> Parsing shield data ...", _blue);
             _shield = GetShieldData();
@@ -735,7 +796,7 @@ namespace fooIUO.Basher
                 return _green;
             }
 
-            if (GetCharges(GetBagOfSending()) >= 25)
+            if (GetCharges(GetBagOfSending()) >= 10)
             {
                 return _yellow;
             }
@@ -763,7 +824,7 @@ namespace fooIUO.Basher
                 return _yellow;
             }
 
-            if (count <= 10)
+            if (count <= 15)
             {
                 return _red;
             }
@@ -774,7 +835,13 @@ namespace fooIUO.Basher
 
         private int CountEnchantedApples()
         {
-            return Player.Backpack.Contains.Where(x => x.ItemID == 0x2FD8 && x.Hue == 0x0488).FirstOrDefault().Amount;
+            Item apples = Player.Backpack.Contains.Where(x => x.ItemID == 0x2FD8 && x.Hue == 0x0488).FirstOrDefault();
+
+            if (apples != null)
+            {
+                return apples.Amount;
+            }
+            return 0;
         }
 
 
@@ -791,7 +858,7 @@ namespace fooIUO.Basher
             basherGump.x = 600;
             basherGump.y = 100;
 
-            Gumps.AddBackground(ref basherGump, 0, 0, 380, 100, 3500);
+            Gumps.AddBackground(ref basherGump, 0, 0, 450, 100, 3500);
             Gumps.AddLabel(ref basherGump, 30, 15, 1258, "fooBasher Status Gump");
 
             // Shield durability monitor
@@ -817,7 +884,10 @@ namespace fooIUO.Basher
             Gumps.AddButton(ref basherGump, 300, 66, 0x4BA, 0x4B9, 2, 1, 1);
             Gumps.AddLabel(ref basherGump, 320, 65, GetStatusHue("DF"), "DF");
 
-
+            Gumps.AddButton(ref basherGump, 360, 46, 0x4BA, 0x4B9, 3, 1, 1);
+            Gumps.AddLabel(ref basherGump, 380, 45, GetStatusHue("Blues?"), "Blues?");
+            Gumps.AddButton(ref basherGump, 360, 66, 0x4BA, 0x4B9, 4, 1, 1);
+            Gumps.AddLabel(ref basherGump, 380, 65, GetStatusHue("EOO"), "EOO");
 
 
             Gumps.CloseGump(_gumpId);
@@ -850,7 +920,6 @@ namespace fooIUO.Basher
         }
 
 
-
         private int GetStatusHue(string spell)
         {
             switch (spell)
@@ -861,10 +930,27 @@ namespace fooIUO.Basher
                 case "DF":
                     return (UseDivineFury) ? _green : _red;
 
+                case "Blues?":
+                    return (TargetBlues) ? _green : _red;
+
+                case "EOO":
+                    return (UseEnemyOfOne) ? _green : _red;
+
                 default:
                     return 0;
             }
         }
+
+
+
+        private bool IsEOOTarget(Mobile target)
+        {
+            List<string> eooList = _eooTargets.ConvertAll(x => x.ToLower());
+
+            return (eooList.Contains(target.Name.ToLower())) ? true : false;
+        }
+
+
 
 
         /// <summary>
@@ -901,6 +987,19 @@ namespace fooIUO.Basher
                             UpdateGump();
                             Misc.Pause(ParseDelay);
                             continue;
+
+                        case 3:
+                            TargetBlues ^= true;
+                            UpdateGump();
+                            Misc.Pause(ParseDelay);
+                            continue;
+
+                        case 4:
+                            UseEnemyOfOne ^= true;
+                            UpdateGump();
+                            Misc.Pause(ParseDelay);
+                            continue;
+
                     }
 
                     Mobile target = GenerateTargetList().FirstOrDefault();
@@ -924,14 +1023,22 @@ namespace fooIUO.Basher
                             }
                         }
 
+                        if (UseEnemyOfOne && GenerateTargetList().Count == 1 && IsEOOTarget(target) && !Player.BuffsExist("Enemy Of One"))
+                        {
+                            Spells.CastChivalry("Enemy Of One");
+                            Misc.Pause(GetSpellDelay());
+                        }
+
+                        if (GenerateTargetList().Count > 1 && Player.BuffsExist("Enemy Of One"))
+                        {
+                            Spells.CastChivalry("Enemy Of One");
+                            Misc.Pause(GetSpellDelay());
+                        }
+
                         AttackTarget(target);
                     }
 
-
-
-
-
-                    if (journal.Search("Repairing..."))
+                    if (journal.Search("Repairing"))
                     {
                         journal.Clear();
                         UpdateGump();
@@ -981,5 +1088,30 @@ namespace fooIUO.Basher
         }
 
         public BasherShield() {}
+    }
+
+
+    public class SlayerType
+    {
+        public int ServUOId { get; set; }
+        public string Name { get; set; }
+
+        public SlayerType(int servUOId, string name)
+        {
+            ServUOId = servUOId;
+            Name = name;
+        }
+    }
+
+    public class PriorityTarget
+    {
+        public string Name { get; set; }
+        public List<SlayerType> SlayerType { get; set; }
+
+        public PriorityTarget(string name, List<SlayerType> slayer)
+        {
+            Name = name;
+            SlayerType = slayer;
+        }
     }
 }
