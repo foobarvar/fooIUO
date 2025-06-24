@@ -56,8 +56,8 @@ namespace fooIUO.Basher
         /// The serial (!) of the anti-paralyze crate. Leave at 0 if you have none, but you should really have one.
         /// Serial can be given as decimal or hexadecimal integer.
         /// </summary>
-        //public int AntiParalyzeCrate { get; private set; } = 0;
         public int AntiParalyzeCrate { get; private set; } = 0;
+        //public int AntiParalyzeCrate { get; private set; } = 0x4007FBAA;
 
         /// <summary>
         /// Sets whether or not the script shall attempt to automatically cure the Blood Oath curse whenever it
@@ -134,7 +134,7 @@ namespace fooIUO.Basher
             "Anon", "Virtuebane", "Ozymandias", "Juo'nar",
 
             // general assholes
-            "evil spellbook", "Slasher of Veils", "Putrefier", "Harrower",
+            "evil spellbook", "The Slasher of Veils", "Putrefier", "Harrower",
         };
 
 
@@ -1029,7 +1029,7 @@ namespace fooIUO.Basher
                             Misc.Pause(GetSpellDelay());
                         }
 
-                        if (GenerateTargetList().Count > 1 && Player.BuffsExist("Enemy Of One"))
+                        if (UseEnemyOfOne && GenerateTargetList().Count > 1 && Player.BuffsExist("Enemy Of One"))
                         {
                             Spells.CastChivalry("Enemy Of One");
                             Misc.Pause(GetSpellDelay());
