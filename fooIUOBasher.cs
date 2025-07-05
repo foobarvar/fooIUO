@@ -57,7 +57,6 @@ namespace fooIUO.Basher
         /// Serial can be given as decimal or hexadecimal integer.
         /// </summary>
         public int AntiParalyzeCrate { get; private set; } = 0;
-        //public int AntiParalyzeCrate { get; private set; } = 0x4007FBAA;
 
         /// <summary>
         /// Sets whether or not the script shall attempt to automatically cure the Blood Oath curse whenever it
@@ -260,10 +259,27 @@ namespace fooIUO.Basher
                 {
                     Misc.SendMessage($"foo> Breaking paralysis ...", _yellow);
                     Items.UseItem(crate);
-                    Misc.Pause(ParseDelay * 3);
+                    Misc.Pause(ParseDelay * 2);
                 }
             }
         }
+
+
+        private void RemoveCurseSelf()
+        {
+            while (Player.BuffsExist("Blood Oath (curse)"))
+            {
+                Spells.CastChivalry("Remove Curse");
+                Target.WaitForTarget(1500, true);
+                Target.Self();
+                Misc.Pause(ParseDelay * 3);
+            }
+
+            Player.HeadMessage(_green, "BLOOD OATH CURED!");
+        }
+
+
+
 
 
         /// <summary>
@@ -275,6 +291,10 @@ namespace fooIUO.Basher
         /// </summary>
         private void CureBloodOath()
         {
+            Journal journal = new Journal();
+            journal.Clear();
+
+
             if (!AutoCureBloodOath)
             {
                 return;
@@ -282,32 +302,30 @@ namespace fooIUO.Basher
 
             Item enchantedApples = Player.Backpack.Contains.Where(x => x.ItemID == 0x2FD8 && x.Hue == 0x0488).FirstOrDefault();
 
-            if (enchantedApples == null)
+            if (Player.BuffsExist("Blood Oath (curse)") && enchantedApples != null)
             {
-                return;
-            }
+                Player.HeadMessage(_red, "BLOOD OATH ACTIVE!");
+                Items.UseItem(enchantedApples);
+                Misc.Pause(ParseDelay);
 
-            if (Player.BuffsExist("Blood Oath (curse)"))
-            {
-                if (enchantedApples != null)
+                if (!journal.Search("another enchanted apple"))
                 {
-                    Items.UseItem(enchantedApples);
                     Misc.SendMessage($"foo> Enchanted apple eaten. Blood Oath cured!", _green);
+                    Player.HeadMessage(_green, "BLOOD OATH CURED!");
                     UpdateGump();
-                    Misc.Pause(100);
+                    Misc.Pause(ParseDelay);
                 }
                 else
                 {
-                    Misc.SendMessage($"foo> No enchanted apples found, attempting to cure Blood Oath by Remove Curse.", _blue);
-
-                    while (Player.BuffsExist("Blood Oath (curse)"))
-                    {
-                        Spells.CastChivalry("Remove Curse");
-                        Target.WaitForTarget(1000, true);
-                        Target.Self();
-                        Misc.Pause(ParseDelay * 3);
-                    }
+                    Misc.SendMessage($"foo> Enchanted apples on cooldown, attempting Remove Curse!", _red);
+                    RemoveCurseSelf();
                 }
+            }
+            else if (Player.BuffsExist("Blood Oath (curse)"))
+            {
+                Player.HeadMessage(_red, "BLOOD OATH ACTIVE!");
+                Misc.SendMessage($"foo> No enchanted apples found, attempting Remove Curse!", _red);
+                RemoveCurseSelf();
             }
         }
 
@@ -330,6 +348,11 @@ namespace fooIUO.Basher
         /// <returns>the number of remaining charges</returns>
         private int GetCharges(Item bag)
         {
+            if (bag == null)
+            {
+                return 0;
+            }
+
             Property charges = bag.Properties.Last();
             string value = Regex.Match(charges.ToString(), @"\d+").Value;
             return Int32.Parse(value);
@@ -456,6 +479,11 @@ namespace fooIUO.Basher
                 {
                     return true;
                 }
+
+                if (properties.IndexOf(keyword, StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    return true;
+                }
             }
 
             return false;
@@ -561,7 +589,6 @@ namespace fooIUO.Basher
         /// <param name="target">the target to attack</param>
         private void AttackTarget(Mobile target)
         {
-
             Player.Attack(target);
             Item weapon = Player.GetItemOnLayer("RightHand");
 
@@ -869,7 +896,7 @@ namespace fooIUO.Basher
             Gumps.AddLabel(ref basherGump, 107, 65, 0, " / " + _shield.MaxDurability.ToString());
 
             // Bag of Sending monitor
-            Gumps.AddItem(ref basherGump, 160, 45, GetBagOfSending().ItemID, GetBagOfSending().Hue);
+            Gumps.AddItem(ref basherGump, 160, 45, 0x0E76, 0x08a5);
             Gumps.AddLabel(ref basherGump, 195, 45, 0, "Charges: ");
             Gumps.AddLabel(ref basherGump, 250, 45, GetBagOfSendingChargesHue(), GetCharges(GetBagOfSending()).ToString());
 
@@ -1029,7 +1056,7 @@ namespace fooIUO.Basher
                             Misc.Pause(GetSpellDelay());
                         }
 
-                        if (UseEnemyOfOne && GenerateTargetList().Count > 1 && Player.BuffsExist("Enemy Of One"))
+                        if (UseEnemyOfOne && GenerateTargetList().Count > 1 && IsEOOTarget(target) && Player.BuffsExist("Enemy Of One"))
                         {
                             Spells.CastChivalry("Enemy Of One");
                             Misc.Pause(GetSpellDelay());
